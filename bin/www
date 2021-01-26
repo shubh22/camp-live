@@ -1,0 +1,172 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+
+var app = require('../app');
+var debug = require('debug')('server:server');
+var http = require('http');
+const { MongoClient } = require("mongodb");
+
+/**
+ * Get port from environment and store in Express.
+ */
+
+var port = normalizePort(process.env.PORT || '5000');
+app.set('port', port);
+
+/**
+ * Create HTTP server.
+ */
+
+var server = http.createServer(app);
+var io = require('socket.io')(server);
+
+io.on('connection', (socket) => {
+  socket.on("disconnecting", (reason) => {
+    console.log("left room")
+    const uri =
+    "mongodb+srv://shubham:H7ZqtPyQudV4PqlJ@cluster0.yk5sx.mongodb.net/camp?retryWrites=true&w=majority";
+  
+    const client = new MongoClient(uri);
+    let user_id = socket.user_id
+    let room = socket.room
+    async function run() {
+      try {
+        await client.connect();
+    
+        const database = client.db('camp');
+
+        const collection1 = database.collection('rooms_users');
+        const query1 = { room_name: room,user_id: user_id };
+        const member = await collection1.deleteOne(query1)
+
+        const collection2 = database.collection('rooms_admin');
+        const query2 = { room_name: room, admin_id: user_id};
+        const member1 = await collection2.deleteOne(query2);
+        
+        // if(member1){
+        //    if(member1.admin_id === user_id){
+        //         is_admin = true
+        //     }
+        // }
+        // else{
+        //     is_admin = true
+        //     const collection3 = database.collection('rooms_admin');
+        //     const query3 = { room_name: req.query.roomName, admin_id: user_id};
+        //     const member3 = await collection3.insertOne(query3);
+        // }
+
+      } finally {
+        
+        await client.close();
+      }
+    }
+    run().catch(console.dir);
+  });
+  socket.on("joinRoom", (event) => {
+    socket.room = event
+    socket.join(event);
+  });
+  socket.on("updateUserId", (event) => {
+    socket.user_id = event
+  });
+  console.log('a user connected', socket.id);
+  // socket.emit('request', /* … */); // emit an event to the socket
+  // io.emit('broadcast', /* … */); // emit an event to all connected sockets
+  socket.on('drawing', (event) => { // listen to the event
+    console.log("event", event)
+    io.to(socket.room).emit('drawing', event);
+
+  }); 
+  socket.on('select-video', (event) => { // listen to the event
+    console.log("event", event)
+    io.to(socket.room).emit('select-video', event);
+
+  }); 
+  socket.on('start-session', (event) => { // listen to the event
+    console.log("event", event)
+    io.to(socket.room).emit('start-session', event);
+
+  }); 
+  socket.on('play-video', (event) => { // listen to the event
+    console.log("event", event)
+    io.to(socket.room).emit('play-video', event);
+
+  }); 
+  socket.on('pause-video', (event) => { // listen to the event
+    console.log("event", event)
+    io.to(socket.room).emit('pause-video', event);
+
+  }); 
+
+});
+
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+
+server.listen(port);
+server.on('error', onError);
+server.on('listening', onListening);
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+
+function normalizePort(val) {
+  var port = parseInt(val, 10);
+
+  if (isNaN(port)) {
+    // named pipe
+    return val;
+  }
+
+  if (port >= 0) {
+    // port number
+    return port;
+  }
+
+  return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+
+function onError(error) {
+  if (error.syscall !== 'listen') {
+    throw error;
+  }
+
+  var bind = typeof port === 'string'
+    ? 'Pipe ' + port
+    : 'Port ' + port;
+
+  // handle specific listen errors with friendly messages
+  switch (error.code) {
+    case 'EACCES':
+      console.error(bind + ' requires elevated privileges');
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      console.error(bind + ' is already in use');
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+
+function onListening() {
+  var addr = server.address();
+  var bind = typeof addr === 'string'
+    ? 'pipe ' + addr
+    : 'port ' + addr.port;
+  debug('Listening on ' + bind);
+}
