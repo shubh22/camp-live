@@ -40,23 +40,29 @@ io.on('connection', (socket) => {
 
         const collection1 = database.collection('rooms_users');
         const query1 = { room_name: room,user_id: user_id };
-        const member = await collection1.deleteOne(query1)
+        const member1 = await collection1.deleteOne(query1)
+        const query5 = { room_name: room };
+        const num = await collection1.find(query5).count();
+          io.to(socket.room).emit('online-users', num);
 
         const collection2 = database.collection('rooms_admin');
         const query2 = { room_name: room, admin_id: user_id};
-        const member1 = await collection2.deleteOne(query2);
+        const member2 = await collection2.deleteOne(query2);
+
+        if(socket.admin){
+          const collection3 = database.collection('rooms_users');
+          const query3 = { room_name: room };
+          const member3 = await collection3.findOne(query3);
+          
+          if(member3){
+            const collection4 = database.collection('rooms_admin');
+            const query4 = { room_name: room, admin_id: member3.user_id };
+            const member4 = await collection4.insertOne(query4);
+            io.to(socket.room).emit('new-admin', member3.user_id);
+          }
+        }
         
-        // if(member1){
-        //    if(member1.admin_id === user_id){
-        //         is_admin = true
-        //     }
-        // }
-        // else{
-        //     is_admin = true
-        //     const collection3 = database.collection('rooms_admin');
-        //     const query3 = { room_name: req.query.roomName, admin_id: user_id};
-        //     const member3 = await collection3.insertOne(query3);
-        // }
+
 
       } finally {
         
@@ -68,9 +74,36 @@ io.on('connection', (socket) => {
   socket.on("joinRoom", (event) => {
     socket.room = event
     socket.join(event);
+    const uri =
+    "mongodb+srv://shubham:H7ZqtPyQudV4PqlJ@cluster0.yk5sx.mongodb.net/camp?retryWrites=true&w=majority";
+  
+    const client = new MongoClient(uri);
+    let room = socket.room
+    async function run() {
+      try {
+        await client.connect();
+    
+        const database = client.db('camp');
+
+        const collection1 = database.collection('rooms_users');
+        const query5 = { room_name: room };
+        const num = await collection1.find(query5).count();
+          io.to(socket.room).emit('online-users', num);
+        
+
+
+      } finally {
+        
+        await client.close();
+      }
+    }
+    run().catch(console.dir);
   });
   socket.on("updateUserId", (event) => {
     socket.user_id = event
+  });
+  socket.on("userAdmin", (event) => {
+    socket.admin = event
   });
   console.log('a user connected', socket.id);
   // socket.emit('request', /* … */); // emit an event to the socket
@@ -88,6 +121,11 @@ io.on('connection', (socket) => {
   socket.on('start-session', (event) => { // listen to the event
     console.log("event", event)
     io.to(socket.room).emit('start-session', event);
+
+  }); 
+  socket.on('end-session', (event) => { // listen to the event
+    console.log("event", event)
+    io.to(socket.room).emit('end-session', event);
 
   }); 
   socket.on('play-video', (event) => { // listen to the event
